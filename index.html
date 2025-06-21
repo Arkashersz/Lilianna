@@ -1074,7 +1074,7 @@ ligeiramente para fora da Polaroid.
     </div>
 
     <audio id="backgroundMusic" loop>
-        <source src="music/Tim Maia Eu Amo Você.mp3" type="audio/mpeg">
+        <source src="music/Tim Maia  Você.mp3" type="audio/mpeg">
     </audio>
 
     <script>
@@ -1083,10 +1083,11 @@ ligeiramente para fora da Polaroid.
         const totalPhotos = 5;
         let isPlaying = false;
         let isDragging = false;
-        let startX = 0;
-        let startY = 0;
-        let currentRotationX = 0;
-        let currentRotationY = 0;
+        let startX = 0, startY = 0;
+        let latestX = 0, latestY = 0; // Guarda a última posição do mouse
+        let currentRotationX = 0, currentRotationY = 0;
+        let initialRotationX = 0, initialRotationY = 0; // Guarda a rotação no início do arraste
+        let ticking = false; // Controla o requestAnimationFrame
 
         // Textos das fotos
         const photoTexts = [
@@ -1257,7 +1258,12 @@ ligeiramente para fora da Polaroid.
             // Reset rotação
             currentRotationX = 0;
             currentRotationY = 0;
-            updateModalRotation();
+
+            // --- CORREÇÃO IMPORTANTE ---
+            // Como a função updateModalRotation() foi removida na otimização,
+            // aplicamos o reset da transformação diretamente aqui.
+            const modalPolaroid = document.getElementById('modalPolaroid');
+            modalPolaroid.style.transform = `rotateX(0deg) rotateY(0deg)`;
 
             // Adicionar event listeners para arrastar
             addDragListeners();
@@ -1295,6 +1301,7 @@ ligeiramente para fora da Polaroid.
         }
 
         function startDrag(e) {
+            // Ignora o clique se for no botão de fechar (Correção anterior mantida)
             if (e.target.closest('.modal-close')) return;
 
             e.preventDefault();
@@ -1305,39 +1312,59 @@ ligeiramente para fora da Polaroid.
 
             startX = clientX;
             startY = clientY;
+
+            // IMPORTANTE: Salva a rotação atual no exato momento em que o arraste começa.
+            initialRotationX = currentRotationX;
+            initialRotationY = currentRotationY;
         }
 
         function drag(e) {
             if (!isDragging) return;
-
             e.preventDefault();
 
-            const clientX = e.clientX || e.touches[0].clientX;
-            const clientY = e.clientY || e.touches[0].clientY;
+            // Apenas atualiza as coordenadas mais recentes
+            latestX = e.clientX || e.touches[0].clientX;
+            latestY = e.clientY || e.touches[0].clientY;
 
-            const deltaX = clientX - startX;
-            const deltaY = clientY - startY;
-
-            currentRotationY += deltaX * 0.5;
-            currentRotationX -= deltaY * 0.5;
-
-            // Limitar rotação
-            currentRotationX = Math.max(-45, Math.min(45, currentRotationX));
-            currentRotationY = Math.max(-45, Math.min(45, currentRotationY));
-
-            updateModalRotation();
-
-            startX = clientX;
-            startY = clientY;
+            // E solicita uma atualização de animação (sem fazer o cálculo aqui)
+            requestTick();
         }
 
         function endDrag() {
             isDragging = false;
         }
 
-        function updateModalRotation() {
+        // Função para agendar a atualização da animação de forma eficiente
+        function requestTick() {
+            if (!ticking) {
+                requestAnimationFrame(updateAnimation);
+            }
+            ticking = true;
+        }
+
+        // Função que realmente calcula e aplica a transformação
+        function updateAnimation() {
+            if (!ticking) return; // Sai se não houver um tick agendado
+
+            // Calcula o delta total desde o INÍCIO do arraste
+            const deltaX = latestX - startX;
+            const deltaY = latestY - startY;
+
+            // A nova rotação é a rotação inicial + o delta do movimento
+            // Ajustei a sensibilidade para 0.4 para um toque mais suave
+            currentRotationY = initialRotationY + (deltaX * 0.4);
+            currentRotationX = initialRotationX - (deltaY * 0.4);
+
+            // Limitei a rotação para um efeito mais controlado
+            currentRotationX = Math.max(-50, Math.min(50, currentRotationX));
+            currentRotationY = Math.max(-50, Math.min(50, currentRotationY));
+
+            // Aplica a transformação no elemento
             const modalPolaroid = document.getElementById('modalPolaroid');
             modalPolaroid.style.transform = `rotateX(${currentRotationX}deg) rotateY(${currentRotationY}deg)`;
+
+            // Libera o 'tick' para que um novo quadro possa ser agendado
+            ticking = false;
         }
 
         // Controle de música
